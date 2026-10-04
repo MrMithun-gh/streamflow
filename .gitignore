@@ -1,0 +1,30 @@
+# Secrets: never commit these
+.env
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Spark / streaming runtime files
+checkpoints/
+spark-warehouse/
+metastore_db/
+derby.log
+
+# Airflow runtime files
+airflow/logs/
+airflow/*.db
+airflow/airflow-webserver.pid
+
+# Local data and Docker volume dumps
+data/
+*.csv
+pgdata/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
