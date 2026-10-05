@@ -29,10 +29,13 @@ services:
 
       # Limit memory so we don't starve an 8 GB machine
       KAFKA_HEAP_OPTS: "-Xms512m -Xmx512m"
+
     volumes:
       - kafka_data:/var/lib/kafka/data
+
     networks:
       - streamflow-net
+
     healthcheck:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
       interval: 15s
@@ -40,28 +43,70 @@ services:
       retries: 10
       start_period: 20s
 
+
   postgres:
     image: postgres:16
     container_name: streamflow-postgres
     ports:
       - "${POSTGRES_PORT}:5432"   # host 5433 -> container 5432
+
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+
     volumes:
       - pg_data:/var/lib/postgresql/data
+
     networks:
       - streamflow-net
+
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+
+  spark:
+    image: apache/spark:3.5.3
+    container_name: streamflow-spark
+    user: root                       # dev simplification: avoids volume permission issues
+
+    command: ["sleep", "infinity"]   # idle container; we run jobs via docker exec
+
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092      # INTERNAL listener, not localhost
+      KAFKA_TOPIC: ${KAFKA_TOPIC}
+
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432                       # container port, not 5433
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+
+    volumes:
+      - ./spark:/app/spark                    # your code, editable from Windows
+      - ./checkpoints:/app/checkpoints        # Spark progress files
+      - spark_ivy:/tmp/.ivy                   # caches downloaded connector jars
+
+    mem_limit: 2g
+
+    networks:
+      - streamflow-net
+
+
 volumes:
   kafka_data:
   pg_data:
+  spark_ivy:
+
 
 networks:
   streamflow-net:
